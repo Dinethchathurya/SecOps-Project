@@ -145,16 +145,46 @@
             <span class="cwe-tag">CWE-250</span>
           </div>
           <h3>6. Outdated Docker Base & Root Execution</h3>
-          <p class="flaw-desc">Dockerfile runs on vulnerable <code>node:14-alpine</code> containing OS CVEs, runs as <code>USER root</code>, and embeds <code>netcat</code>, <code>curl</code>, and <code>telnet</code>.</p>
+          <p class="flaw-desc">Dockerfile runs on vulnerable <code>node:14-alpine</code> containing OS CVEs, runs as <code>USER root</code>, and embeds <code>netcat</code>, <code>curl</code>, and <code>busybox-extras</code>.</p>
           <div class="snippet-box">
             <code>FROM node:14.21.3-alpine3.17 # Unpatched OS CVEs</code><br>
             <code>USER root # Privilege escalation vulnerability</code><br>
-            <code>RUN apk add curl netcat-openbsd telnet # Unneeded tools</code>
+            <code>RUN apk add curl netcat-openbsd busybox-extras</code>
           </div>
           <div class="action-row">
             <button class="btn btn-secondary" onclick="viewContainerConfig()">View Container Spec</button>
           </div>
           <div id="container-output" class="output-box hidden"></div>
+        </div>
+
+        <!-- Card 7: OS Command Injection (SonarCloud / SAST) -->
+        <div class="flaw-card card-sast">
+          <div class="card-header">
+            <span class="tool-tag tag-sast">Target: SonarCloud / SAST</span>
+            <span class="cwe-tag">CWE-78</span>
+          </div>
+          <h3>7. OS Command Injection</h3>
+          <p class="flaw-desc">Raw input directly concatenated into <code>child_process.exec("ping -c 1 " + host)</code> allowing arbitrary shell command execution.</p>
+          <div class="input-group">
+            <input type="text" id="cmd-input" value="127.0.0.1; whoami; id" placeholder="Host or command payload">
+            <button class="btn btn-danger" onclick="testCommandInjection()">Exploit Command</button>
+          </div>
+          <div id="cmd-output" class="output-box hidden"></div>
+        </div>
+
+        <!-- Card 8: Path Traversal (SonarCloud / SAST) -->
+        <div class="flaw-card card-sast">
+          <div class="card-header">
+            <span class="tool-tag tag-sast">Target: SonarCloud / SAST</span>
+            <span class="cwe-tag">CWE-22</span>
+          </div>
+          <h3>8. Path Traversal (Arbitrary File Read)</h3>
+          <p class="flaw-desc">Unsanitized file path parameter passed to <code>fs.readFileSync</code> allowing directory escape (e.g. <code>../../package.json</code>).</p>
+          <div class="input-group">
+            <input type="text" id="path-input" value="../../package.json" placeholder="File path to traverse">
+            <button class="btn btn-danger" onclick="testPathTraversal()">Read File</button>
+          </div>
+          <div id="path-output" class="output-box hidden"></div>
         </div>
 
       </div>
@@ -312,6 +342,34 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ "__proto__": { "polluted": "CRITICAL: Global Prototype Contaminated by lodash@4.17.15!" } })
         });
+        const data = await res.json();
+        out.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+      } catch (err) {
+        out.innerHTML = `<span class="error">Error: ${err.message}</span>`;
+      }
+    }
+
+    async function testCommandInjection() {
+      const h = encodeURIComponent(document.getElementById('cmd-input').value);
+      const out = document.getElementById('cmd-output');
+      out.classList.remove('hidden');
+      out.innerHTML = 'Executing OS command injection...';
+      try {
+        const res = await fetch(`/api/tools/ping?host=${h}`);
+        const data = await res.json();
+        out.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+      } catch (err) {
+        out.innerHTML = `<span class="error">Error: ${err.message}</span>`;
+      }
+    }
+
+    async function testPathTraversal() {
+      const p = encodeURIComponent(document.getElementById('path-input').value);
+      const out = document.getElementById('path-output');
+      out.classList.remove('hidden');
+      out.innerHTML = 'Executing path traversal file read...';
+      try {
+        const res = await fetch(`/api/tools/read-log?file=${p}`);
         const data = await res.json();
         out.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
       } catch (err) {

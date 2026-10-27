@@ -16,11 +16,8 @@ jobs:
   # ============================================================================
   # RUNNER 1 (GATING CHECK): Gitleaks Secret Gate
   # ============================================================================
-  # Execution Architecture: This job runs FIRST as a blocking gate.
-  # It inspects full git commit history, commit diffs, and repository files
-  # for leaked credentials, private keys, and high-entropy API tokens.
-  # In production, a secret leak halts the pipeline immediately.
-  # For benchmarking, continue-on-error is set to allow downstream fan-out.
+  # Runs FIRST as a blocking gate check.
+  # Scans entire git history and files for leaked keys, AWS credentials, and tokens.
   # ============================================================================
   gitleaks-secrets-gate:
     name: "Runner 1: Gitleaks Secret Gate"
@@ -29,18 +26,46 @@ jobs:
       - name: Checkout Code with Full Git History
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Full history required to scan all historical commits
+          fetch-depth: 0 # Full commit history required for secrets scanning
+
+      - name: Setup Node.js Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Standalone Gitleaks Scanner
+        run: |
+          echo "Installing latest official Gitleaks binary..."
+          curl -sSL -o /tmp/gitleaks.tar.gz https://github.com/gitleaks/gitleaks/releases/download/v8.18.2/gitleaks_8.18.2_linux_x64.tar.gz
+          tar -xzf /tmp/gitleaks.tar.gz -C /usr/local/bin gitleaks
+          chmod +x /usr/local/bin/gitleaks
+          gitleaks version
 
       - name: Run Gitleaks Secret Scanner
-        uses: gitleaks/gitleaks-action@v2
-        continue-on-error: true # Demonstrates detection without aborting downstream benchmark runners
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITLEAKS_CONFIG: .gitleaks.toml
-        with:
-          args: detect --source=. --config=.gitleaks.toml --report-format=sarif --report-path=gitleaks-report.sarif --verbose
+        id: run_gitleaks
+        continue-on-error: true # Allows downstream runners to execute for benchmark demo
+        run: |
+          echo "Scanning repository files and full git history with custom .gitleaks.toml..."
+          gitleaks detect \
+            --source=. \
+            --config=.gitleaks.toml \
+            --report-format=json \
+            --report-path=gitleaks-report.json \
+            --verbose || true
 
-      - name: Upload Gitleaks SARIF Report to Security Tab
+          # Also generate SARIF output
+          gitleaks detect \
+            --source=. \
+            --config=.gitleaks.toml \
+            --report-format=sarif \
+            --report-path=gitleaks-report.sarif || true
+
+      - name: Generate Gitleaks Visual Step Summary
+        if: always()
+        run: |
+          node scripts/format-summary.js gitleaks
+
+      - name: Upload Gitleaks SARIF to Security Tab
         uses: github/codeql-action/upload-sarif@v3
         if: always()
         continue-on-error: true
@@ -48,19 +73,21 @@ jobs:
           sarif_file: gitleaks-report.sarif
           category: gitleaks-secrets
 
-      - name: Upload Gitleaks Artifact
+      - name: Upload Gitleaks Report Artifacts
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: gitleaks-report
-          path: gitleaks-report.sarif
+          path: |
+            gitleaks-report.json
+            gitleaks-report.sarif
           if-no-files-found: ignore
 
   # ============================================================================
-  # RUNNER 2 (PARALLEL FAN-OUT): SAST - SonarCloud / SonarQube
+  # RUNNER 2 (PARALLEL FAN-OUT): SAST - Code AST Taint Analysis
   # ============================================================================
   # Launched simultaneously with Runners 3 & 4 after Runner 1 completes.
-  # Performs AST Taint Analysis for SQL Injection, Reflected XSS, and MD5 hashing.
+  # Detects SQL Injection, Command Injection, XSS, Path Traversal, and MD5 hashing.
   # ============================================================================
   sast-sonarcloud:
     name: "Runner 2: SonarCloud SAST (AST Analysis)"
@@ -75,10 +102,11 @@ jobs:
       - name: Setup Node.js Runtime
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
 
-      - name: Execute SonarCloud / SonarScanner Analysis
-        uses: SonarSource/sonarcloud-github-action@master
+      - name: Execute SonarCloud Scan (If Token Configured)
+        if: env.SONAR_TOKEN != ''
+        uses: SonarSource/sonarqube-scan-action@master
         continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -89,12 +117,25 @@ jobs:
             -Dsonar.sources=src
             -Dsonar.exclusions=node_modules/**,data/**
 
-      - name: Fallback Local SAST Analysis (Semgrep)
-        # Executes if SonarCloud token is not configured in local fork
+      - name: Execute Standalone SAST AST Taint Analysis (Semgrep)
+        continue-on-error: true
+        run: |
+          echo "Running standalone SAST AST taint analysis across src/..."
+          npx --yes semgrep \
+            --config=p/security-audit \
+            --config=p/owasp-top-ten \
+            --config=p/javascript \
+            --json --output=sast-results.json src/ || true
+
+          npx --yes semgrep \
+            --config=p/security-audit \
+            --config=p/owasp-top-ten \
+            --sarif --output=sast-results.sarif src/ || true
+
+      - name: Generate SAST Visual Step Summary
         if: always()
         run: |
-          echo "Executing supplementary SAST AST rules scan..."
-          npx --yes semgrep --config=p/security-audit --config=p/owasp-top-ten --sarif --output=sast-results.sarif src/ || true
+          node scripts/format-summary.js sast
 
       - name: Upload SAST SARIF Report
         uses: github/codeql-action/upload-sarif@v3
@@ -104,11 +145,21 @@ jobs:
           sarif_file: sast-results.sarif
           category: sast-code-analysis
 
+      - name: Upload SAST Artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sast-reports
+          path: |
+            sast-results.json
+            sast-results.sarif
+          if-no-files-found: ignore
+
   # ============================================================================
   # RUNNER 3 (PARALLEL FAN-OUT): SCA - Snyk Dependency Security
   # ============================================================================
   # Launched simultaneously with Runners 2 & 4 after Runner 1 completes.
-  # Scans package.json against NVD/Snyk vulnerability database for CVEs.
+  # Scans package.json against NVD & Snyk vulnerability database for CVEs.
   # ============================================================================
   sca-snyk:
     name: "Runner 3: Snyk SCA (Dependency Manifest)"
@@ -121,12 +172,16 @@ jobs:
       - name: Setup Node.js Runtime
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
 
-      - name: Install Application Dependencies
-        run: npm install --package-lock-only || true
+      - name: Execute Native Dependency Security Audit
+        run: |
+          echo "Generating dependency vulnerability manifest audit..."
+          npm audit --json > npm-audit.json || true
+          echo "Audit completed. Evaluating CVEs..."
 
-      - name: Run Snyk Dependency Vulnerability Scan
+      - name: Run Snyk Dependency Scan (If Token Configured)
+        if: env.SNYK_TOKEN != ''
         uses: snyk/actions/node@master
         continue-on-error: true
         env:
@@ -134,20 +189,10 @@ jobs:
         with:
           args: --sarif-file-output=snyk-report.sarif --json-file-output=snyk-report.json --severity-threshold=low
 
-      - name: Fallback Native SCA Scan (npm audit)
+      - name: Generate SCA Visual Step Summary
         if: always()
         run: |
-          echo "Generating npm security audit baseline..."
-          npm audit --json > npm-audit.json || true
-          echo "Audit completed. Known vulnerable dependencies detected."
-
-      - name: Upload Snyk SARIF Report to Security Tab
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
-        continue-on-error: true
-        with:
-          sarif_file: snyk-report.sarif
-          category: snyk-sca
+          node scripts/format-summary.js sca
 
       - name: Upload Snyk Artifacts
         uses: actions/upload-artifact@v4
@@ -155,9 +200,9 @@ jobs:
         with:
           name: snyk-sca-reports
           path: |
+            npm-audit.json
             snyk-report.sarif
             snyk-report.json
-            npm-audit.json
           if-no-files-found: ignore
 
   # ============================================================================
@@ -175,6 +220,11 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+
+      - name: Setup Node.js Runtime
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
 
       - name: Build Local Container Image
         run: |
@@ -199,6 +249,11 @@ jobs:
           format: 'sarif'
           output: 'trivy-config-results.sarif'
           severity: 'CRITICAL,HIGH,MEDIUM'
+
+      - name: Generate Trivy Visual Step Summary
+        if: always()
+        run: |
+          node scripts/format-summary.js trivy
 
       - name: Upload Trivy Container SARIF Report
         uses: github/codeql-action/upload-sarif@v3
