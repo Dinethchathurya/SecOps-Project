@@ -90,7 +90,7 @@ jobs:
   # Detects SQL Injection, Command Injection, XSS, Path Traversal, and MD5 hashing.
   # ============================================================================
   sast-sonarcloud:
-    name: "Runner 2: Semgrep SAST (AST Analysis)"
+    name: "Runner 2: Semgrep SAST (AST Analysis)| Sonarqube"
     needs: [gitleaks-secrets-gate]
     runs-on: ubuntu-latest
     steps:
