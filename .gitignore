@@ -8,3 +8,4 @@ test-check.txt
 dist/
 coverage/
 .scannerwork/
+.env.example
