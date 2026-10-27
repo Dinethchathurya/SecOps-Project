@@ -15,9 +15,9 @@
 # ==============================================================================
 
 # FLAW 1: Outdated, end-of-life base image with known OS CVEs
-FROM node:14.21.3-alpine3.17
+# FROM node:14.21.3-alpine3.17
 # FROM node:10.16.0-alpine
-
+FROM node:22-alpine
 
 
 # Set working directory
