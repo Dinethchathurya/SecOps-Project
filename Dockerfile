@@ -24,11 +24,11 @@ WORKDIR /app
 USER root
 
 # FLAW 3: Installing unnecessary debugging and network tools in production runtime
+# Note: busybox-extras provides telnet; curl and netcat-openbsd provide network extraction
 RUN apk update && \
     apk add --no-cache \
     curl \
     netcat-openbsd \
-    telnet \
     busybox-extras \
     bash \
     python3 \

@@ -3,6 +3,7 @@ npm-debug.log
 data/*.sqlite
 data/*.sqlite-journal
 reports/
+test-check.txt
 .DS_Store
 dist/
 coverage/
