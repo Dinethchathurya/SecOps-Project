@@ -90,7 +90,7 @@ jobs:
   # Detects SQL Injection, Command Injection, XSS, Path Traversal, and MD5 hashing.
   # ============================================================================
   sast-sonarcloud:
-    name: "Runner 2: SonarCloud SAST (AST Analysis)"
+    name: "Runner 2: Semgrep SAST (AST Analysis)"
     needs: [gitleaks-secrets-gate]
     runs-on: ubuntu-latest
     steps:
@@ -117,20 +117,28 @@ jobs:
             -Dsonar.sources=src
             -Dsonar.exclusions=node_modules/**,data/**
 
-      - name: Execute Standalone SAST AST Taint Analysis (Semgrep)
-        continue-on-error: true
+      - name: Setup Python for Semgrep
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Install Official Semgrep CLI
         run: |
-          echo "Running standalone SAST AST taint analysis across src/..."
-          npx --yes semgrep \
+          python -m pip install semgrep
+          semgrep --version
+
+      - name: Execute Standalone SAST AST Taint Analysis (Semgrep)
+        run: |
+          # Findings are expected in this lab; scan errors must still fail the step.
+          semgrep scan \
             --config=p/security-audit \
             --config=p/owasp-top-ten \
             --config=p/javascript \
-            --json --output=sast-results.json src/ || true
-
-          npx --yes semgrep \
-            --config=p/security-audit \
-            --config=p/owasp-top-ten \
-            --sarif --output=sast-results.sarif src/ || true
+            --metrics=off \
+            --json-output=sast-results.json \
+            --sarif-output=sast-results.sarif src/
+          test -s sast-results.json
+          test -s sast-results.sarif
 
       - name: Generate SAST Visual Step Summary
         if: always()
@@ -139,7 +147,7 @@ jobs:
 
       - name: Upload SAST SARIF Report
         uses: github/codeql-action/upload-sarif@v3
-        if: always()
+        if: always() && hashFiles('sast-results.sarif') != ''
         continue-on-error: true
         with:
           sarif_file: sast-results.sarif
@@ -233,22 +241,34 @@ jobs:
 
       - name: Run Trivy Image Vulnerability Scan (OS Packages & CVEs)
         uses: aquasecurity/trivy-action@master
-        continue-on-error: true
         with:
           image-ref: 'secops-vulnerable-app:${{ github.sha }}'
-          format: 'sarif'
-          output: 'trivy-image-results.sarif'
-          severity: 'CRITICAL,HIGH'
+          scanners: 'vuln'
+          format: 'json'
+          output: 'trivy-image-results.json'
+          exit-code: '0' # Findings are expected; execution errors still fail.
+          severity: 'UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL'
 
       - name: Run Trivy Dockerfile / IaC Misconfiguration Scan
+        if: ${{ !cancelled() }}
         uses: aquasecurity/trivy-action@master
-        continue-on-error: true
         with:
           scan-type: 'config'
           scan-ref: '.'
-          format: 'sarif'
-          output: 'trivy-config-results.sarif'
-          severity: 'CRITICAL,HIGH,MEDIUM'
+          format: 'json'
+          output: 'trivy-config-results.json'
+          exit-code: '0'
+          severity: 'UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL'
+
+      - name: Combine Trivy JSON Reports for Summary
+        if: ${{ !cancelled() }}
+        run: node scripts/merge-trivy-reports.js
+
+      - name: Convert Trivy JSON Reports to SARIF
+        if: ${{ !cancelled() && hashFiles('trivy-image-results.json') != '' && hashFiles('trivy-config-results.json') != '' }}
+        run: |
+          trivy convert --format sarif --output trivy-image-results.sarif trivy-image-results.json
+          trivy convert --format sarif --output trivy-config-results.sarif trivy-config-results.json
 
       - name: Generate Trivy Visual Step Summary
         if: always()
@@ -257,7 +277,7 @@ jobs:
 
       - name: Upload Trivy Container SARIF Report
         uses: github/codeql-action/upload-sarif@v3
-        if: always()
+        if: always() && hashFiles('trivy-image-results.sarif') != ''
         continue-on-error: true
         with:
           sarif_file: trivy-image-results.sarif
@@ -265,7 +285,7 @@ jobs:
 
       - name: Upload Trivy IaC Config SARIF Report
         uses: github/codeql-action/upload-sarif@v3
-        if: always()
+        if: always() && hashFiles('trivy-config-results.sarif') != ''
         continue-on-error: true
         with:
           sarif_file: trivy-config-results.sarif
@@ -277,6 +297,9 @@ jobs:
         with:
           name: trivy-reports
           path: |
+            trivy-report.json
+            trivy-image-results.json
+            trivy-config-results.json
             trivy-image-results.sarif
             trivy-config-results.sarif
           if-no-files-found: ignore
