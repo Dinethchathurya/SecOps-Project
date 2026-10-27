@@ -15,8 +15,8 @@
 # ==============================================================================
 
 # FLAW 1: Outdated, end-of-life base image with known OS CVEs
-FROM node:14.21.3-alpine3.17
-#FROM node:16.3.0-alpine
+# FROM node:14.21.3-alpine3.17
+FROM node:16.3.0-alpine
 
 # Set working directory
 WORKDIR /app
@@ -52,11 +52,11 @@ RUN mkdir -p /app/data
 
 
 # FIX 2 & 3: Create a non-root user, set permissions, remove production bloat, and switch users
-# RUN addgroup -S appgroup && adduser -S appuser -G appgroup && \
-#     chown -R appuser:appgroup /app
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup && \
+    chown -R appuser:appgroup /app
 
-# # Switch to the non-root user for all subsequent instructions (like CMD or ENTRYPOINT)
-# USER appuser
+# Switch to the non-root user for all subsequent instructions (like CMD or ENTRYPOINT)
+USER appuser
 
 
 
