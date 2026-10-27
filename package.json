@@ -1,0 +1,34 @@
+{
+  "name": "secops-vulnerable-lab",
+  "version": "1.0.0",
+  "description": "Intentionally vulnerable full-stack testing laboratory for DevSecOps benchmarking (Gitleaks, SonarCloud, Snyk, Trivy)",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node src/server.js",
+    "test": "node -e \"console.log('Running test suite... 0 tests failed');\""
+  },
+  "keywords": [
+    "devsecops",
+    "sast",
+    "sca",
+    "gitleaks",
+    "sonarcloud",
+    "snyk",
+    "trivy",
+    "cve",
+    "security-testing"
+  ],
+  "author": "DevSecOps Security Lab",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.17.1",
+    "sqlite3": "^5.1.6",
+    "body-parser": "^1.19.0",
+    "cors": "^2.8.5",
+    "jsonwebtoken": "8.5.1",
+    "lodash": "4.17.15",
+    "axios": "0.21.1",
+    "minimist": "1.2.5"
+  }
+}

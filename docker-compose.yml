@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  # ============================================================================
+  # SERVICE 1: Intentionally Vulnerable Full-Stack Application
+  # ============================================================================
+  secops-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: secops-vulnerable-app:latest
+    container_name: secops-testing-lab-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - DATABASE_URL=postgres://secops_admin:SuperSecretP@ssw0rd2024!@secops-db:5432/production_db
+      - AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE
+      - AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      secops-db:
+        condition: service_healthy
+    networks:
+      - secops-network
+
+  # ============================================================================
+  # SERVICE 2: Mock Production PostgreSQL Database
+  # ============================================================================
+  secops-db:
+    image: postgres:14-alpine
+    container_name: secops-testing-lab-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: secops_admin
+      POSTGRES_PASSWORD: SuperSecretP@ssw0rd2024!
+      POSTGRES_DB: production_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U secops_admin -d production_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - secops-network
+
+networks:
+  secops-network:
+    driver: bridge
+
+volumes:
+  postgres-data:

@@ -1,0 +1,68 @@
+# ==============================================================================
+# GITLEAKS CONFIGURATION FILE (.gitleaks.toml)
+# Target: Secrets, Credentials, and Cryptographic Key Hunting
+# ==============================================================================
+# Benchmarking Target: Runner 1 (Secret Gate in CI/CD Pipeline)
+# Scans git history, commit diffs, and workspace files for high-entropy tokens
+# and credential patterns.
+# ==============================================================================
+
+title = "DevSecOps Benchmark Gitleaks Configuration"
+
+# Global allowlist (optional: exclude git directory, node_modules)
+[allowlist]
+description = "Global allowlist for build artifacts"
+paths = [
+  '''^\.git/''',
+  '''node_modules''',
+  '''package-lock\.json''',
+  '''data/database\.sqlite'''
+]
+
+# Rule 1: AWS Access Key ID
+[[rules]]
+id = "aws-access-key-id"
+description = "AWS IAM Access Key ID detected"
+regex = '''(A3T[A-Z0-9]|AKIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASIA)[A-Z0-9]{16}'''
+keywords = ["AKIA", "ASIA", "aws_access_key_id"]
+severity = "critical"
+
+# Rule 2: AWS Secret Access Key
+[[rules]]
+id = "aws-secret-access-key"
+description = "AWS Secret Access Key detected"
+regex = '''(?i)(?:aws_secret_access_key|aws_secret|secret_key)[\s]*[=:][\s]*['"]?([a-zA-Z0-9\/+=]{40})['"]?'''
+keywords = ["aws_secret_access_key", "secret_key"]
+severity = "critical"
+
+# Rule 3: RSA / OpenSSH Private Keys
+[[rules]]
+id = "rsa-private-key"
+description = "Unencrypted Private Cryptographic Key (RSA/OpenSSH/EC) detected"
+regex = '''-----BEGIN (?:RSA|OPENSSH|DSA|EC|PGP)? PRIVATE KEY-----'''
+keywords = ["BEGIN RSA PRIVATE KEY", "BEGIN OPENSSH PRIVATE KEY", "BEGIN PRIVATE KEY"]
+severity = "critical"
+
+# Rule 4: Leaked Database Connection URIs with credentials
+[[rules]]
+id = "database-connection-uri"
+description = "Database connection string containing embedded credentials"
+regex = '''(?:postgres|postgresql|mysql|mongodb|redis)://[a-zA-Z0-9_-]+:[^@\s]+@[a-zA-Z0-9.-]+:[0-9]+/[a-zA-Z0-9_.-]+'''
+keywords = ["postgres://", "mysql://", "mongodb://"]
+severity = "high"
+
+# Rule 5: Stripe Secret / Live API Keys
+[[rules]]
+id = "stripe-secret-key"
+description = "Stripe Live Secret Key detected"
+regex = '''(?:sk_live|rk_live)_[0-9a-zA-Z]{24,}'''
+keywords = ["sk_live", "rk_live"]
+severity = "high"
+
+# Rule 6: GitHub Personal Access Tokens (Classic & Fine-Grained)
+[[rules]]
+id = "github-pat"
+description = "GitHub Personal Access Token detected"
+regex = '''(?:ghp|gho|ghu|ghs|ghr)_[a-zA-Z0-9]{36,255}'''
+keywords = ["ghp_", "gho_"]
+severity = "high"

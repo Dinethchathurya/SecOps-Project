@@ -1,0 +1,9 @@
+node_modules/
+npm-debug.log
+data/*.sqlite
+data/*.sqlite-journal
+reports/
+.DS_Store
+dist/
+coverage/
+.scannerwork/

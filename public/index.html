@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DevSecOps Testing Laboratory & Benchmark</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="layout">
+    <header class="header">
+      <div class="header-content">
+        <div class="badge">TEST ENVIRONMENT</div>
+        <h1>DevSecOps Testing Laboratory</h1>
+        <p class="subtitle">Benchmarking Gitleaks, SonarCloud, Snyk, and Trivy across isolated security flaw domains</p>
+      </div>
+      <div class="pipeline-status">
+        <div class="gate-card">
+          <span class="status-indicator"></span>
+          <span>CI Pipeline: <strong>2-Tier Parallel Topology</strong></span>
+        </div>
+      </div>
+    </header>
+
+    <main class="main-content">
+      <!-- Architecture Banner -->
+      <section class="banner-section">
+        <h2>CI/CD Pipeline Security Architecture</h2>
+        <div class="architecture-grid">
+          <div class="arch-box gate">
+            <div class="step-num">RUNNER 1: GATING CHECK</div>
+            <h3>Gitleaks Secret Gate</h3>
+            <p>Scans git commit history and config files before fan-out. Hardcoded AWS tokens, leaked RSA keys, and .env credentials.</p>
+            <span class="pill pill-gate">Blocks Pipeline</span>
+          </div>
+          <div class="fan-out-arrow">&rarr; Parallel Fan-Out &rarr;</div>
+          <div class="arch-box parallel">
+            <div class="step-num">RUNNER 2 (PARALLEL)</div>
+            <h3>SonarCloud (SAST)</h3>
+            <p>AST taint analysis for SQL Injection, Reflected XSS, and weak MD5/SHA-1 cryptography.</p>
+            <span class="pill pill-sast">Code Analysis</span>
+          </div>
+          <div class="arch-box parallel">
+            <div class="step-num">RUNNER 3 (PARALLEL)</div>
+            <h3>Snyk (SCA)</h3>
+            <p>Dependency manifest analysis for Lodash, Axios, and JWT CVEs. Generates SARIF logs.</p>
+            <span class="pill pill-sca">Dependency CVEs</span>
+          </div>
+          <div class="arch-box parallel">
+            <div class="step-num">RUNNER 4 (PARALLEL)</div>
+            <h3>Trivy (Container)</h3>
+            <p>Scans outdated Alpine base image, root user enforcement, and unnecessary debugging tools.</p>
+            <span class="pill pill-container">OS & IaC Flaws</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Interactive Flaw Demonstrations -->
+      <h2>Interactive Security Flaw Demonstrations</h2>
+      <div class="grid-2col">
+
+        <!-- Card 1: Secrets & Credentials (Gitleaks) -->
+        <div class="flaw-card card-gitleaks">
+          <div class="card-header">
+            <span class="tool-tag tag-gitleaks">Target: Gitleaks</span>
+            <span class="cwe-tag">CWE-798</span>
+          </div>
+          <h3>1. Secrets & Credentials Leak</h3>
+          <p class="flaw-desc">High-entropy AWS keys, private RSA certificates, and mock production database connection URIs committed into repository.</p>
+          <div class="snippet-box">
+            <code>AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE</code><br>
+            <code>DATABASE_URL=postgres://secops_admin:SuperSecret...</code>
+          </div>
+          <div class="action-row">
+            <button class="btn btn-secondary" onclick="viewSecrets()">Inspect Leaked Secrets</button>
+          </div>
+          <div id="secrets-output" class="output-box hidden"></div>
+        </div>
+
+        <!-- Card 2: SQL Injection (SonarCloud) -->
+        <div class="flaw-card card-sast">
+          <div class="card-header">
+            <span class="tool-tag tag-sast">Target: SonarCloud</span>
+            <span class="cwe-tag">CWE-89</span>
+          </div>
+          <h3>2. SQL Injection (SAST)</h3>
+          <p class="flaw-desc">Raw user input concatenated directly into SQLite SQL query string without prepared statements.</p>
+          <div class="input-group">
+            <input type="text" id="sqli-input" value="' OR '1'='1" placeholder="Enter search query or SQL payload">
+            <button class="btn btn-danger" onclick="testSQLi()">Exploit SQLi</button>
+            <button class="btn btn-success" onclick="testSecureSQL()">Test Secure</button>
+          </div>
+          <div id="sqli-output" class="output-box hidden"></div>
+        </div>
+
+        <!-- Card 3: Reflected XSS (SonarCloud) -->
+        <div class="flaw-card card-sast">
+          <div class="card-header">
+            <span class="tool-tag tag-sast">Target: SonarCloud</span>
+            <span class="cwe-tag">CWE-79</span>
+          </div>
+          <h3>3. Reflected Cross-Site Scripting</h3>
+          <p class="flaw-desc">Express route renders query parameter directly into raw HTML template without HTML encoding or CSP headers.</p>
+          <div class="input-group">
+            <input type="text" id="xss-input" value="<script>alert('Reflected XSS Demonstrated!')</script>" placeholder="Payload">
+            <button class="btn btn-danger" onclick="triggerXSS()">Trigger XSS</button>
+            <button class="btn btn-success" onclick="triggerSecureXSS()">View Secure</button>
+          </div>
+        </div>
+
+        <!-- Card 4: Insecure Cryptography (SonarCloud) -->
+        <div class="flaw-card card-sast">
+          <div class="card-header">
+            <span class="tool-tag tag-sast">Target: SonarCloud</span>
+            <span class="cwe-tag">CWE-327 / CWE-328</span>
+          </div>
+          <h3>4. Insecure MD5 & SHA-1 Hashing</h3>
+          <p class="flaw-desc">Passwords stored using broken, un-salted MD5 hash function vulnerable to instant rainbow table inversion.</p>
+          <div class="input-group">
+            <input type="text" id="hash-password" value="SuperSecretPassword123" placeholder="Password to hash">
+            <button class="btn btn-danger" onclick="testInsecureHash()">Hash with MD5</button>
+            <button class="btn btn-success" onclick="testSecureHash()">Hash with PBKDF2</button>
+          </div>
+          <div id="hash-output" class="output-box hidden"></div>
+        </div>
+
+        <!-- Card 5: Vulnerable Dependencies (Snyk) -->
+        <div class="flaw-card card-sca">
+          <div class="card-header">
+            <span class="tool-tag tag-sca">Target: Snyk SCA</span>
+            <span class="cwe-tag">CWE-1321</span>
+          </div>
+          <h3>5. Outdated Dependencies (Prototype Pollution)</h3>
+          <p class="flaw-desc">Uses <code>lodash@4.17.15</code> (CVE-2019-10744), <code>axios@0.21.1</code>, and <code>jsonwebtoken@8.5.1</code>.</p>
+          <div class="action-row">
+            <button class="btn btn-danger" onclick="testPrototypePollution()">Trigger Prototype Pollution</button>
+          </div>
+          <div id="sca-output" class="output-box hidden"></div>
+        </div>
+
+        <!-- Card 6: Container & OS Misconfigurations (Trivy) -->
+        <div class="flaw-card card-trivy">
+          <div class="card-header">
+            <span class="tool-tag tag-trivy">Target: Trivy</span>
+            <span class="cwe-tag">CWE-250</span>
+          </div>
+          <h3>6. Outdated Docker Base & Root Execution</h3>
+          <p class="flaw-desc">Dockerfile runs on vulnerable <code>node:14-alpine</code> containing OS CVEs, runs as <code>USER root</code>, and embeds <code>netcat</code>, <code>curl</code>, and <code>telnet</code>.</p>
+          <div class="snippet-box">
+            <code>FROM node:14.21.3-alpine3.17 # Unpatched OS CVEs</code><br>
+            <code>USER root # Privilege escalation vulnerability</code><br>
+            <code>RUN apk add curl netcat-openbsd telnet # Unneeded tools</code>
+          </div>
+          <div class="action-row">
+            <button class="btn btn-secondary" onclick="viewContainerConfig()">View Container Spec</button>
+          </div>
+          <div id="container-output" class="output-box hidden"></div>
+        </div>
+
+      </div>
+
+      <!-- Vulnerability Matrix Reference -->
+      <section class="matrix-section">
+        <h2>DevSecOps Detection & Coverage Matrix</h2>
+        <div class="table-container">
+          <table class="benchmark-table">
+            <thead>
+              <tr>
+                <th>Vulnerability</th>
+                <th>Location</th>
+                <th>Detecting Scanner</th>
+                <th>Why Other Scanners Ignored It</th>
+                <th>Remediation Step</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>AWS Keys & Private RSA Certs</strong></td>
+                <td><code>.env.example</code>, <code>src/config/</code></td>
+                <td><span class="tag-badge tag-gitleaks">Gitleaks</span></td>
+                <td>SAST, SCA, and Trivy do not search git history or calculate token Shannon entropy.</td>
+                <td>Revoke exposed keys; inject secrets at runtime via Vault / AWS Secrets Manager.</td>
+              </tr>
+              <tr>
+                <td><strong>SQL Injection</strong></td>
+                <td><code>src/routes/users.js</code></td>
+                <td><span class="tag-badge tag-sast">SonarCloud</span></td>
+                <td>Gitleaks lacks AST taint tracking; SCA only checks packages; Trivy checks container layers.</td>
+                <td>Adopt parameterized queries (prepared statements) or an ORM with parameter binding.</td>
+              </tr>
+              <tr>
+                <td><strong>Reflected XSS</strong></td>
+                <td><code>src/routes/profile.js</code></td>
+                <td><span class="tag-badge tag-sast">SonarCloud</span></td>
+                <td>String concatenation into HTTP responses is custom code logic, invisible to SCA & Trivy.</td>
+                <td>Perform context-aware HTML entity encoding or enforce a strict Content-Security-Policy.</td>
+              </tr>
+              <tr>
+                <td><strong>Broken Cryptography (MD5)</strong></td>
+                <td><code>src/routes/auth.js</code></td>
+                <td><span class="tag-badge tag-sast">SonarCloud</span></td>
+                <td><code>crypto</code> is a built-in module (not a third-party CVE for SCA); Gitleaks ignores functions.</td>
+                <td>Migrate to Argon2id, bcrypt, or PBKDF2-HMAC-SHA512 with per-user cryptographic salts.</td>
+              </tr>
+              <tr>
+                <td><strong>Prototype Pollution & CVEs</strong></td>
+                <td><code>package.json</code> (lodash, jsonwebtoken)</td>
+                <td><span class="tag-badge tag-sca">Snyk</span></td>
+                <td>Custom code SAST does not correlate dependency version tags against NVD/CVE databases.</td>
+                <td>Upgrade to patched library releases (e.g., <code>lodash &gt;= 4.17.21</code>).</td>
+              </tr>
+              <tr>
+                <td><strong>Outdated OS Image & Root Execution</strong></td>
+                <td><code>Dockerfile</code></td>
+                <td><span class="tag-badge tag-trivy">Trivy</span></td>
+                <td>SAST and SCA analyze application code/manifests; they do not inspect base OS libraries.</td>
+                <td>Use minimal modern base (<code>node:20-alpine</code>), set <code>USER node</code>, remove netcat/curl.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>DevSecOps Testing Laboratory &bull; Educational & Benchmarking Artifact &bull; Run with <code>docker-compose up --build</code></p>
+    </footer>
+  </div>
+
+  <script>
+    async function testSQLi() {
+      const q = encodeURIComponent(document.getElementById('sqli-input').value);
+      const out = document.getElementById('sqli-output');
+      out.classList.remove('hidden');
+      out.innerHTML = 'Executing SQL injection request...';
+      try {
+        const res = await fetch(`/api/users/search?query=${q}`);
+        const data = await res.json();
+        out.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+      } catch (err) {
+        out.innerHTML = `<span class="error">Error: ${err.message}</span>`;
+      }
+    }
+
+    async function testSecureSQL() {
+      const q = encodeURIComponent(document.getElementById('sqli-input').value);
+      const out = document.getElementById('sqli-output');
+      out.classList.remove('hidden');
+      out.innerHTML = 'Executing parameterized search...';
+      try {
+        const res = await fetch(`/api/users/search-secure?query=${q}`);
+        const data = await res.json();
+        out.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+      } catch (err) {
+        out.innerHTML = `<span class="error">Error: ${err.message}</span>`;
+      }
+    }
+
+    function triggerXSS() {
+      const payload = encodeURIComponent(document.getElementById('xss-input').value);
+      window.open(`/profile/greeting?name=${payload}`, '_blank');
+    }
+
+    function triggerSecureXSS() {
+      const payload = encodeURIComponent(document.getElementById('xss-input').value);
+      window.open(`/profile/greeting-secure?name=${payload}`, '_blank');
+    }
+
+    async function testInsecureHash() {
+      const pwd = document.getElementById('hash-password').value;
+      const out = document.getElementById('hash-output');
+      out.classList.remove('hidden');
+      out.innerHTML = 'Computing unsalted MD5 hash...';
+      try {
+        const res = await fetch('/api/auth/register-insecure', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: 'demo_' + Date.now(), password: pwd })
+        });
+        const data = await res.json();
+        out.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+      } catch (err) {
+        out.innerHTML = `<span class="error">Error: ${err.message}</span>`;
+      }
+    }
+
+    async function testSecureHash() {
+      const pwd = document.getElementById('hash-password').value;
+      const out = document.getElementById('hash-output');
+      out.classList.remove('hidden');
+      out.innerHTML = 'Computing salted PBKDF2 hash...';
+      try {
+        const res = await fetch('/api/auth/register-secure', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: 'demo_' + Date.now(), password: pwd })
+        });
+        const data = await res.json();
+        out.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+      } catch (err) {
+        out.innerHTML = `<span class="error">Error: ${err.message}</span>`;
+      }
+    }
+
+    async function testPrototypePollution() {
+      const out = document.getElementById('sca-output');
+      out.classList.remove('hidden');
+      out.innerHTML = 'Sending prototype pollution payload to lodash.merge...';
+      try {
+        const res = await fetch('/api/data/merge', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ "__proto__": { "polluted": "CRITICAL: Global Prototype Contaminated by lodash@4.17.15!" } })
+        });
+        const data = await res.json();
+        out.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+      } catch (err) {
+        out.innerHTML = `<span class="error">Error: ${err.message}</span>`;
+      }
+    }
+
+    function viewSecrets() {
+      const out = document.getElementById('secrets-output');
+      out.classList.remove('hidden');
+      out.innerHTML = `<pre>{
+  "file": ".env.example",
+  "leaks": [
+    "AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE",
+    "AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+    "DATABASE_URL=postgres://secops_admin:SuperSecretP@ssw0rd2024!@prod-db.internal.corp:5432/production_db",
+    "STRIPE_SECRET_KEY=sk_live_51HzT99KzL9876543210abcdefgEXAMPLEKEY998877665544",
+    "RSA_PRIVATE_KEY in src/config/jwtRS256.key"
+  ]
+}</pre>`;
+    }
+
+    function viewContainerConfig() {
+      const out = document.getElementById('container-output');
+      out.classList.remove('hidden');
+      out.innerHTML = `<pre>{
+  "target": "Dockerfile",
+  "baseImage": "node:14.21.3-alpine3.17 (Outdated Alpine with known CVEs)",
+  "user": "root (Unrestricted container root user)",
+  "unnecessaryPackages": ["curl", "netcat-openbsd", "telnet", "busybox-extras"],
+  "exposedPorts": [3000, 22, 8080],
+  "scanner": "Trivy (Vulnerability & Misconfiguration Detection)"
+}</pre>`;
+    }
+  </script>
+</body>
+</html>
