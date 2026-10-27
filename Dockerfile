@@ -18,7 +18,7 @@
 # FROM node:14.21.3-alpine3.17
 FROM node:10.16.0-alpine
 # FROM node:16.3.0-alpine
-# FROM node:10.15.3-jessie
+FROM node:10.15.3-jessie
 
 # Set working directory
 WORKDIR /app
