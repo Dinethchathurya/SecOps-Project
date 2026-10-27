@@ -52,23 +52,25 @@ RUN mkdir -p /app/data
 
 
 # FIX 2 & 3: Create a non-root user, set permissions, remove production bloat, and switch users
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup && \
-    chown -R appuser:appgroup /app
+# RUN addgroup -S appgroup && adduser -S appuser -G appgroup && \
+#     chown -R appuser:appgroup /app
 
-# Switch to the non-root user for all subsequent instructions (like CMD or ENTRYPOINT)
-USER appuser
+# # Switch to the non-root user for all subsequent instructions (like CMD or ENTRYPOINT)
+# USER appuser
 
 
 
 # FLAW 4: Exposing sensitive unnecessary administrative ports (SSH port 22, debug port 8080)
 #EXPOSE 3000 22 8080
-EXPOSE 3000 8080 22
+EXPOSE 3000 8080 
 
 # Environment variables
 ENV NODE_ENV=production
 ENV PORT=3000
 
 # FLAW 5: No HEALTHCHECK instruction defined (triggers Dockerfile misconfiguration scanner)
+
+RUN --interval=30s --timeout=5s --start-period=5s --retries=3 CMD curl -f http://localhost:3000/health || exit 1
 
 # Launch application as root
 CMD ["node", "src/server.js"]
