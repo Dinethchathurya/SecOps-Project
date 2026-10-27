@@ -69,8 +69,9 @@ ENV NODE_ENV=production
 ENV PORT=3000
 
 # FLAW 5: No HEALTHCHECK instruction defined (triggers Dockerfile misconfiguration scanner)
-
-RUN --interval=30s --timeout=5s --start-period=5s --retries=3 CMD curl -f http://localhost:3000/health || exit 1
+# FIX 5: Added HEALTHCHECK instruction using curl
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:3000/health || exit 1
 
 # Launch application as root
 CMD ["node", "src/server.js"]
