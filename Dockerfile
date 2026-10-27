@@ -58,7 +58,7 @@ RUN mkdir -p /app/data
 
 # FLAW 4: Exposing sensitive unnecessary administrative ports (SSH port 22, debug port 8080)
 #EXPOSE 3000 22 8080
-EXPOSE 3000 8080
+EXPOSE 3000 8080 22
 
 # Environment variables
 ENV NODE_ENV=production
