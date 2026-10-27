@@ -22,14 +22,8 @@ FROM node:14.21.3-alpine3.17
 WORKDIR /app
 
 # FLAW 2: Explicitly running as root user (violates least privilege)
-#USER root
+USER root
 
-# FIX 2 & 3: Create a non-root user, set permissions, remove production bloat, and switch users
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup && \
-    chown -R appuser:appgroup /app
-
-# Switch to the non-root user for all subsequent instructions (like CMD or ENTRYPOINT)
-USER appuser
 
 # FLAW 3: Installing unnecessary debugging and network tools in production runtime
 # Note: busybox-extras provides telnet; curl and netcat-openbsd provide network extraction
@@ -55,6 +49,16 @@ COPY . .
 
 # Ensure data directory exists with write permissions
 RUN mkdir -p /app/data
+
+
+# FIX 2 & 3: Create a non-root user, set permissions, remove production bloat, and switch users
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup && \
+    chown -R appuser:appgroup /app
+
+# Switch to the non-root user for all subsequent instructions (like CMD or ENTRYPOINT)
+USER appuser
+
+
 
 # FLAW 4: Exposing sensitive unnecessary administrative ports (SSH port 22, debug port 8080)
 #EXPOSE 3000 22 8080
