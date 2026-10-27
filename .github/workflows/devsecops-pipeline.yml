@@ -91,7 +91,7 @@ jobs:
   # ============================================================================
   sast-sonarcloud:
     name: "Runner 2: Semgrep SAST (AST Analysis)"
-    #needs: [gitleaks-secrets-gate]
+    needs: [gitleaks-secrets-gate]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
